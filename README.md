@@ -41,7 +41,7 @@ vim .bash_profile
 export PATH=$PATH:/root/spark/bin/
 
 # add
-export PATH=$PATH:/root/persistent-hdfs/bin/hadoop`
+export PATH=$PATH:/root/persistent-hdfs/bin/
 
 ```
 
