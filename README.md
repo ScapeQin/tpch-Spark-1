@@ -11,7 +11,7 @@ It builds on the official TPC-H benchmark available at http://tpc.org/tpch/defau
 ## 2. Setup TPC-H benchmark
 
 ### 2.1 下载最新版TPC-H
-First, download the TPC-H benchmark from http://tpc.org/tpch/default.asp and extract it to a directory
+First, download the TPC-H benchmark from `http://tpc.org/tpch/default.asp` and extract it to a directory
 
 ```
 $ wget http://tpc.org/tpch/spec/tpch_2_17_2.tgz
@@ -36,23 +36,18 @@ WORKLOAD = TPCH
 ```
 
 ### 2.2 使用本repo 自带的旧版TPC-H
-Then you can run
+
+配置过后，Then you can run
 
 ```
 make
 ```
 
-## 3. Generating data
+## 3. Generating data in `dbgen` folder
 Right, so let's generate the data using the dbgen tool - there's one important parameter 'scale' that influences the amount of data. It's roughly equal to number of GB of raw data, so to generate 10GB of data just do
 
 ```
-$ ./dbgen -s 10
-```
-
-```
-[root@imysql tpch]# time ./dbgen -s 50
-TPC-H Population Generator (Version 2.9.0)
-Copyright Transaction Processing Performance Council 1994 - 2008
+$ time ./dbgen -s 2
 
 real    192m43.897s
 user    37m45.398s
@@ -60,7 +55,7 @@ sys     19m4.132s
 ```
 
 ```
-[root@imysql tpch]# ls -lh *tbl
+$ ls -lh *tbl
 -rw-r--r-- 1 root root 1.2G Sep 21 15:23 customer.tbl
 -rw-r--r-- 1 root root 1.4G Sep 21 15:23 lineitem.tbl
 -rw-r--r-- 1 root root 2.2K Sep 21 15:23 nation.tbl
@@ -69,14 +64,19 @@ sys     19m4.132s
 -rw-r--r-- 1 root root 464K Sep 21 15:23 part.tbl
 -rw-r--r-- 1 root root  389 Sep 21 15:23 region.tbl
 -rw-r--r-- 1 root root  69M Sep 21 15:23 supplier.tbl
+
+$ pwd
+/root/tpch-spark/dbgen
 ```
-dbgen参数 -s 的作用是指定生成测试数据的仓库数，建议基准值设定在100以上，在我的测试环境中，一般都设定为1000。
+
 
 ##  load into HDFS
 After the dataset is generated, they need to be loaded in to Hadoop distributed file system (HDFS).
 There is a script for doing that under ./data directory. But first you have to move all the dataset to that directory.
 ```
-mv ../../../tpch_2_17_0/dbgen/*.tbl ./data   
+cd 
+mkdir data
+mv /root/tpch-spark/dbgen/*.tbl /root/data   
 ```
 
 Then you can upload them to HDFS by execute the following command:
@@ -85,8 +85,14 @@ Then you can upload them to HDFS by execute the following command:
 $./tpch_prepare_data.sh
 ```
 
+
 ```
-/usr/bin/hadoop fs -mkdir /tpch/ 
+ephemeral-hdfs/bin/hadoop dfs -mkdir /tpch/
+
+#  Cannot create directory /tpch. Name node is in safe mode.
+```
+
+```
 
 /usr/bin/hadoop fs -mkdir /tpch/customer
 /usr/bin/hadoop fs -mkdir /tpch/lineitem
@@ -97,7 +103,7 @@ $./tpch_prepare_data.sh
 /usr/bin/hadoop fs -mkdir /tpch/region
 /usr/bin/hadoop fs -mkdir /tpch/supplier
 
-/usr/bin/hadoop fs -copyFromLocal customer.tbl /tpch/customer/
+/usr/bin/hadoop fs -copyFromLocal /root/data/customer.tbl /tpch/customer/
 /usr/bin/hadoop fs -copyFromLocal lineitem.tbl /tpch/lineitem/
 /usr/bin/hadoop fs -copyFromLocal nation.tbl /tpch/nation/
 /usr/bin/hadoop fs -copyFromLocal orders.tbl /tpch/orders/
