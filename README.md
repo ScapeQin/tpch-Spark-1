@@ -1,23 +1,113 @@
 # tpch-Spark
 
-This is a test including a simple implementation that runs a TPC-H-like benchmark on Spark.
+This is a test including a simple implementation that runs a TPC-H-like benchmark on **Spark 2.0**.
 
 It builds on the official TPC-H benchmark available at http://tpc.org/tpch/default.asp (`dbgen` to generate dataset ).
 
-## 1.  首先，TPC-H 是什么？
+## 阶段-1
+Based on https://github.com/ssavvides/tpch-spark
 
+### 1.1 install sbt on ec2
+```
+curl https://bintray.com/sbt/rpm/rpm | sudo tee /etc/yum.repos.d/bintray-sbt-rpm.repo
+sudo yum install sbt
+```
 
-
-## 2. Setup TPC-H benchmark
-
-### 2.1 下载最新版TPC-H
-First, download the TPC-H benchmark from `http://tpc.org/tpch/default.asp` and extract it to a directory
+### 1.2 git clone tpch-spark
 
 ```
-$ wget http://tpc.org/tpch/spec/tpch_2_17_2.tgz
-$ mkdir tpch
-$ tar -xzf tpch_2_17_2.tgz -C tpch
+git clone https://github.com/ssavvides/tpch-spark
 ```
+
+### 1.3 data generation 
+Go into /tpch-spark/dbgen folder and `make`. `2` represents 2 GB data.
+
+```
+make
+cd /tpch-spark
+./dbgen -s 2
+
+
+# check data
+ls -lh *tbl
+```
+
+### 1.4 add PATH in .bash_profile
+```
+cd 
+vim .bash_profile
+
+# add
+export PATH=$PATH:/root/spark/bin/
+
+# add
+export PATH=$PATH:/root/persistent-hdfs/bin/hadoop`
+
+```
+
+### 1.5 build and run 
+`01` represents `query 01`. (you can use 01, 02, ... 22). `--master local` specifies the spark-mode `e.g local, yarn, standalone` etc...
+
+
+```
+
+# compile using:
+
+sbt package
+
+# run 
+spark-submit --class "main.scala.TpchQuery" --master local /root/tpch-spark/target/scala-2.11/spark-tpc-h-queries_2.11-1.0.jar 01
+```
+
+### 1.6 check result
+go in /dbgen floder
+
+```
+ls output
+```
+
+
+### 1.7.1 load data into HDFS
+
+```
+hdfs dfs -mkdir /tpch/
+hdfs dfs -mkdir /tpch/input/
+
+hdfs dfs -put /root/tpch-spark/dbgen/*.tbl /tpch/input/
+
+hdfs dfs -mkdir /tpch/output/
+```
+
+
+After running the script, you can check the data on HDFS with the following command:
+
+```
+hdfs dfs -ls /tpch
+```
+
+### 1.7.2 generate and load HDFS directly
+
+在文件中修改 TpchQuery.scala input 和 output 的地址。
+
+```
+#Make sure you set the INPUT_DIR and OUTPUT_DIR in TpchQuery 
+
+// read from hdfs
+val INPUT_DIR: String = "/dbgen"
+    
+    
+val OUTPUT_DIR: String = "/tpch"
+
+```
+
+## 阶段-2. 从 0 开始
+
+### 2.1 下载TPC-H
+
+```
+git clone https://github.com/gregrahn/tpch-kit
+```
+
 and then prepare the Makefile - create a copy from makefile.suite
 
 ```
@@ -35,16 +125,9 @@ MACHINE = LINUX
 WORKLOAD = TPCH
 ```
 
-### 2.2 使用本repo 自带的旧版TPC-H
 
-配置过后，Then you can run
-
-```
-make
-```
-
-## 3. Generating data in `dbgen` folder
-Right, so let's generate the data using the dbgen tool - there's one important parameter 'scale' that influences the amount of data. It's roughly equal to number of GB of raw data, so to generate 10GB of data just do
+### 2.2. Generating data in `dbgen` folder
+Right, so let's generate the data using the dbgen `tool` - there's one important parameter 'scale' that influences the amount of data. It's roughly equal to number of GB of raw data, so to generate 10GB of data just do
 
 ```
 $ time ./dbgen -s 2
@@ -70,89 +153,42 @@ $ pwd
 ```
 
 
-##  load into HDFS
+###  load into HDFS
 After the dataset is generated, they need to be loaded in to Hadoop distributed file system (HDFS).
 There is a script for doing that under ./data directory. But first you have to move all the dataset to that directory.
+
 ```
 cd 
 mkdir data
 mv /root/tpch-spark/dbgen/*.tbl /root/data   
 ```
 
-Then you can upload them to HDFS by execute the following command:
+
+## 其他-记录
+
+### commad record
 
 ```
-$./tpch_prepare_data.sh
-```
-
-
-```
-ephemeral-hdfs/bin/hadoop dfs -mkdir /tpch/
-
-#  Cannot create directory /tpch. Name node is in safe mode.
-```
-
-```
-
-/usr/bin/hadoop fs -mkdir /tpch/customer
-/usr/bin/hadoop fs -mkdir /tpch/lineitem
-/usr/bin/hadoop fs -mkdir /tpch/nation
-/usr/bin/hadoop fs -mkdir /tpch/orders
-/usr/bin/hadoop fs -mkdir /tpch/part
-/usr/bin/hadoop fs -mkdir /tpch/partsupp
-/usr/bin/hadoop fs -mkdir /tpch/region
-/usr/bin/hadoop fs -mkdir /tpch/supplier
-
-/usr/bin/hadoop fs -copyFromLocal /root/data/customer.tbl /tpch/customer/
-/usr/bin/hadoop fs -copyFromLocal lineitem.tbl /tpch/lineitem/
-/usr/bin/hadoop fs -copyFromLocal nation.tbl /tpch/nation/
-/usr/bin/hadoop fs -copyFromLocal orders.tbl /tpch/orders/
-/usr/bin/hadoop fs -copyFromLocal part.tbl /tpch/part/
-/usr/bin/hadoop fs -copyFromLocal partsupp.tbl /tpch/partsupp/
-/usr/bin/hadoop fs -copyFromLocal region.tbl /tpch/region/
-/usr/bin/hadoop fs -copyFromLocal supplier.tbl /tpch/supplier/
-
-```
-查看导入情况：
-
-After running the script, you can check the data on HDFS with the following command:
-
-```
-$hadoop fs -ls /tpch
-```
-
-
-TPC-H queries implemented in Spark using the DataFrames API. Tested under Spark 2.0.0
-
-## Running
-
-First compile using:
-
-```
-sbt package
-```
-Make sure you set the INPUT_DIR and OUTPUT_DIR in TpchQuery class before compiling to point to the location the of the input data and where the output should be saved.
-
-You can then run a query using:
-
-```
-spark-submit --class "main.scala.TpchQuery" --master MASTER target/scala-2.11/spark-tpc-h-queries_2.11-1.0.jar ##
-```
-
-where `##` is the number of the query to run `e.g 1, 2, ..., 22` and `MASTER` specifies the spark-mode `e.g local, yarn, standalone` etc...
-
-
-
-# 其他-记录
-
-## 命令行记录
-
-[root@host1 20376-hdfs-NAMENODE]# hdfs haadmin -getServiceState namenode1
+hdfs haadmin -getServiceState namenode1
 standby
-[root@host1 20376-hdfs-NAMENODE]# hdfs haadmin -getServiceState namenode2
+hdfs haadmin -getServiceState namenode2
 active
 
-## Reference
+# 想知道公网ip
+
+# 内网ip
+ifconfig ／ hostname
+
+# 替换
+sudo hostname ec2-54-209-221-112.compute-1.amazonaws.com
+```
+
+### log level
+Log4J Levels: ALL > TRACE > DEBUG > INFO > WARN > ERROR > FATAL > OFF
+
+DEBUG – The DEBUG Level designates fine-grained informational events that are most useful to debug an application. 
+
+### Reference
 - https://github.com/ssavvides/tpch-spark
 - https://github.com/kj-ki/tpc-h-impala
 - https://github.com/tvondra/pg_tpch
